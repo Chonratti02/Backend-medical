@@ -1,0 +1,70 @@
+services:
+  # -----------------------------------------------------------
+  # PostgreSQL 16 with pgvector Extension
+  # -----------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: smart_herbal_clinic_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgrespassword}
+      POSTGRES_DB: ${DB_NAME:-smart_herbal_clinic}
+    ports:
+      # Use HOST_DB_PORT if port 5432 is already occupied on host
+      - "${HOST_DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/config/schema.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-smart_herbal_clinic}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medical_ai_net
+
+  # -----------------------------------------------------------
+  # Backend API (Node.js + Express + TypeScript) - Dev Mode
+  # -----------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: smart_herbal_clinic_backend
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      PORT: 3000
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgrespassword}
+      DB_NAME: ${DB_NAME:-smart_herbal_clinic}
+    volumes:
+      # Mount host backend folder for live hot-reload
+      - .:/app
+      # Keep container node_modules isolated from host
+      - /app/node_modules
+      # Persistent upload directory
+      - backend_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - medical_ai_net
+
+volumes:
+  postgres_data:
+    driver: local
+  backend_uploads:
+    driver: local
+
+networks:
+  medical_ai_net:
+    driver: bridge

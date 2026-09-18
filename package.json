@@ -1,0 +1,51 @@
+{
+  "name": "smart-herbal-clinic-backend",
+  "version": "1.0.0",
+  "description": "Smart Herbal Clinic System - Backend API (Node.js + Express + TypeScript)",
+  "main": "dist/server.js",
+  "scripts": {
+    "start": "node dist/server.js",
+    "dev": "nodemon --exec ts-node src/server.ts",
+    "build": "tsc",
+    "db:migrate": "ts-node src/config/migrate.ts",
+    "db:seed": "ts-node src/config/seed.ts",
+    "knowledge:seed": "ts-node src/config/seed-knowledge.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^2.23.0",
+    "@langchain/community": "^0.0.40",
+    "@langchain/google-genai": "^0.0.10",
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.11.0",
+    "cors": "^2.8.5",
+    "csv-parser": "^3.2.1",
+    "dayjs": "^1.11.10",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "langchain": "^0.1.30",
+    "mammoth": "^1.12.3",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "pdf2json": "^4.1.0",
+    "pg": "^8.11.3",
+    "pgvector": "^0.1.7",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/morgan": "^1.9.9",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.11.0",
+    "@types/pg": "^8.11.0",
+    "nodemon": "^3.0.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
