@@ -3,9 +3,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const isSslDisabled = process.env.DB_SSL === 'false';
+
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : undefined,
+  ssl: (!isSslDisabled && process.env.DATABASE_URL) ? { rejectUnauthorized: false } : undefined,
   max: 5, // จำกัด Connection pool สูงสุด 5 connections เพื่อไม่ให้เต็มขีดจำกัดของ Aiven Cloud
   idleTimeoutMillis: 10000, // คืน connection ที่ว่างภายใน 10 วินาที
   connectionTimeoutMillis: 10000,
