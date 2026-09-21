@@ -45,7 +45,10 @@ export const createDisease = async (req: Request, res: Response, next: NextFunct
     const cleanName = disease_name.trim();
 
     // ตรวจสอบว่ามีชื่อนี้อยู่แล้วหรือไม่
-    const existing = await db.query(`SELECT id, disease_name FROM diseases WHERE disease_name = $1`, [cleanName]);
+    const existing = await db.query(
+      `SELECT id, disease_name FROM diseases WHERE LOWER(TRIM(disease_name)) = LOWER($1)`,
+      [cleanName]
+    );
     if (existing.rows.length > 0) {
       const r = existing.rows[0];
       res.json({

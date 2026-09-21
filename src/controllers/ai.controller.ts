@@ -285,6 +285,50 @@ export const analyze = async (req: Request, res: Response, next: NextFunction): 
       }
     }
 
+    // รวมข้อมูล OPD Fields และ Samutthana ที่คำนวณจาก Client เข้ากับ Context อย่างครบถ้วน
+    if (!context) {
+      context = {} as PatientVisitContext;
+    }
+    if (req.body.context && typeof req.body.context === 'object') {
+      context = { ...context, ...req.body.context };
+    }
+    const extraFields = [
+      'clinical_history',
+      'physical_exam',
+      'ttm_exam',
+      'utu_samutthana',
+      'kala_samutthana',
+      'tridhatu_samutthana',
+      'chief_complaint',
+      'illness_start_date',
+      'illness_start_time',
+      'illness_days',
+      'blood_group',
+      'chronic_disease',
+      'pmh',
+      'bmi',
+      'bmi_status',
+      'present_illness',
+      'lunar_birthday',
+      'zodiac_year',
+      'birth_zodiac_element',
+      'birth_rakon',
+      'birth_element_desc',
+      'conception_lunar_month',
+      'conception_zodiac_element',
+      'conception_samutthana',
+      'conception_rakon',
+      'conception_element_desc',
+    ];
+    for (const key of extraFields) {
+      if ((req.body as any)[key] !== undefined && (context as any)[key] === undefined) {
+        (context as any)[key] = (req.body as any)[key];
+      }
+    }
+    if ((req.body as any).present_illness && !(patientData as any).present_illness) {
+      (patientData as any).present_illness = (req.body as any).present_illness;
+    }
+
     const startTime = Date.now();
     const result = await ragService.analyzeMultiSymptom({
       symptoms: symptomList,

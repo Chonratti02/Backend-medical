@@ -115,7 +115,7 @@ export interface Visit {
 
 export interface HerbReference {
   title: string;
-  page: string;
+  page?: string;
   excerpt: string;
 }
 
@@ -180,16 +180,20 @@ export interface Prescription {
 
 export interface HerbalKnowledge {
   id: number;
-  herb_name_th: string;
+  herb_name: string;
+  herb_name_th?: string;
   herb_name_en?: string | null;
   herb_name_sci?: string | null;
-  category?: string | null;
+  part_used?: string | null;
+  taste?: string | null;
   properties?: string | null;
+  category?: string | null;
   indications?: string | null;
   contraindications?: string | null;
   source_scripture?: string | null;
   source_page?: string | null;
-  created_at: Date;
+  created_at?: Date;
+  updated_at?: Date;
 }
 
 export interface Disease {
@@ -293,6 +297,8 @@ export interface PatientVisitContext {
 
 export interface HerbAnalysisItem {
   name: string;
+  taste?: string; // รสยาหลัก เช่น รสเผ็ดร้อน, รสขม, รสสุขุม
+  part_used?: string; // ส่วนที่ใช้ เช่น ราก, ใบ, ดอก, เปลือกต้น
   properties: string;
   usage: string;
   precautions: string;
@@ -304,6 +310,7 @@ export interface ProbableDiseaseItem {
   probability_level: string; // เช่น "สูงมาก (High)", "สูง (High)", "ปานกลาง (Moderate)", "ต้องเฝ้าระวัง (Possible)"
   primary_cause: string; // สมุฏฐานเหตุแห่งโรค เช่น "ปิตตะและเสมหะระคนในระบบทางเดินปัสสาวะ"
   supporting_evidence: string; // ข้อมูลสนับสนุนจากอาการ ธาตุเจ้าเรือน เวลาเกิด อายุ หรือกาลสมุฏฐาน
+  clinical_explanation?: string; // คำอธิบายการวินิจฉัยและการวิเคราะห์เชิงคลินิกอย่างละเอียด
   icd10_or_ttm_code?: string; // รหัสโรคหรือการจัดหมวดตามคัมภีร์
 }
 
@@ -318,12 +325,20 @@ export interface SymptomAnalysisSection {
 export interface MultiSymptomAnalysisResult {
   patient_summary: {
     name?: string;
+    age?: number | null;
+    gender?: string;
     weight?: number | null;
     height?: number | null;
     temperature?: number | null;
+    bp?: string | null;
+    pulse?: number | null;
     allergies?: string;
+    chronic_disease?: string;
     smoking?: string;
     alcohol?: string;
+    body_element?: string;
+    utu_samutthana_summary?: string;
+    kala_samutthana_summary?: string;
   };
   probable_diseases?: ProbableDiseaseItem[];
   symptoms_analysis: SymptomAnalysisSection[];
@@ -371,7 +386,6 @@ export interface KnowledgeUpload {
   file_type?: string | null;
   file_size_bytes?: number | null;
   raw_content?: string | null;
-  total_pages?: number | null;
   total_chunks: number;
   embedding_status: EmbeddingStatus;
   error_message?: string | null;
@@ -386,7 +400,6 @@ export interface KnowledgeChunk {
   upload_id: number;
   chunk_index: number;
   content: string;
-  page_number?: string | null;
   token_count?: number | null;
   embedding?: number[];
   created_at: Date;

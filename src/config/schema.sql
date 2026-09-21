@@ -188,11 +188,14 @@ CREATE INDEX IF NOT EXISTS idx_prescriptions_visit_id ON prescriptions(visit_id)
 CREATE INDEX IF NOT EXISTS idx_prescriptions_status ON prescriptions(status);
 
 -- ------------------------------------------------------------
--- 6. ตารางคลังความรู้สมุนไพรและคัมภีร์แพทย์แผนไทย (Herbal Knowledge) ยังไม่เช็คทั้งหมด อาจขาดบางฟิล
+-- 6. ตารางคลังความรู้สมุนไพรและคัมภีร์แพทย์แผนไทย (Herbal Knowledge)
 -- ------------------------------------------------------------
-CREATE table herbal_knowledge (
-    id SERIAL PRIMARY KEY,                            
-    herb_name VARCHAR(100) NOT NULL                  
+CREATE TABLE IF NOT EXISTS herbal_knowledge (
+    id SERIAL PRIMARY KEY,                                      -- รหัสสมุนไพร (Primary Key)
+    herb_name VARCHAR(100) NOT NULL,                            -- ชื่อสมุนไพร
+    part_used VARCHAR(150) DEFAULT NULL,                        -- ส่วนที่ใช้ทำยา (เช่น ราก, ใบ, ดอก, ผล, เปลือกต้น, แก่น, หัว, เหง้า, ทั้งต้น)
+    taste VARCHAR(150) DEFAULT NULL,                            -- รสยาตามคัมภีร์เภสัชกรรมไทย (เช่น รสเผ็ดร้อน, รสขม, รสหวาน, รสฝาด, รสเปรี้ยว, รสเค็ม, รสหอมเย็น, รสเมาเบื่อ, รสมัน, รสจืด)
+    properties TEXT DEFAULT NULL                                -- สรรพคุณทางยาในการบำบัดรักษาโรคหรืออาการตามคัมภีร์แพทย์แผนไทย
 );
 
 CREATE INDEX IF NOT EXISTS idx_herb_th ON herbal_knowledge(herb_name);
@@ -217,7 +220,6 @@ CREATE TABLE IF NOT EXISTS knowledge_uploads (
     file_type VARCHAR(50) DEFAULT NULL,                         -- ชนิดหรือนามสกุลไฟล์ เช่น pdf, docx, txt, json
     file_size_bytes BIGINT DEFAULT NULL,                        -- ขนาดไฟล์ (หน่วยเป็นไบต์)
     raw_content TEXT DEFAULT NULL,                              -- เนื้อหาข้อความทั้งหมดที่สกัด (Extract) ออกมาจากไฟล์
-    total_pages INT DEFAULT NULL,                               -- จำนวนหน้าทั้งหมดของเอกสาร
     total_chunks INT DEFAULT 0,                                 -- จำนวนชิ้นส่วนข้อความ (Chunks) ที่ตัดแบ่งเพื่อทำ Vector Embedding
     embedding_status VARCHAR(20) NOT NULL DEFAULT 'pending'     -- สถานะการแปลงเป็น Vector: pending, processing, completed, failed
         CHECK (embedding_status IN ('pending', 'processing', 'completed', 'failed')),
@@ -239,7 +241,6 @@ CREATE TABLE IF NOT EXISTS knowledge_chunks (
     upload_id INT NOT NULL REFERENCES knowledge_uploads(id) ON DELETE CASCADE, -- เชื่อมโยงกับไฟล์แม่ใน knowledge_uploads
     chunk_index INT NOT NULL,                                   -- ลำดับที่ของ Chunk เริ่มต้นจาก 0, 1, 2, ...
     content TEXT NOT NULL,                                      -- ข้อความย่อยสำหรับนำไปทำ Embedding และส่งเป็นบริบท (Context) ให้ AI
-    page_number VARCHAR(50) DEFAULT NULL,                       -- เลขหน้าหรือบทที่พบข้อความนี้ในเอกสารต้นฉบับ
     token_count INT DEFAULT NULL,                               -- จำนวนคำหรือโทเค็นโดยประมาณของ Chunk นี้
     embedding vector(768),                                      -- เวกเตอร์ขนาด 768 มิติ สำหรับ Google Gemini Embeddings (pgvector)
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP -- วัน-เวลาที่บันทึก
