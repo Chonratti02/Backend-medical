@@ -368,10 +368,10 @@ export const analyze = async (req: Request, res: Response, next: NextFunction): 
       const insertResult = await db.query(
         `INSERT INTO ai_assessments
           (visit_id, patient_id, doctor_id, query_text, symptoms_queried, patient_context,
-           system_prompt, user_prompt, raw_ai_response, structured_analysis,
+           raw_ai_response, structured_analysis,
            matched_diseases, matched_herbs, knowledge_references,
            ai_response, references_used, recommended_herbs, confidence_score, model_used, processing_ms, token_usage)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
          RETURNING *`,
         [
           visit_id || null,
@@ -380,8 +380,6 @@ export const analyze = async (req: Request, res: Response, next: NextFunction): 
           symptomList.join(', '),
           JSON.stringify(symptomList),
           JSON.stringify(patientData),
-          (result as any).system_prompt || null,
-          (result as any).user_prompt || null,
           (result as any).raw_ai_response || null,
           JSON.stringify({
             patient_summary: result.patient_summary,

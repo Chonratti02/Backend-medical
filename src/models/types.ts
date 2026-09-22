@@ -134,8 +134,6 @@ export interface AiAssessment {
   query_text: string;
   symptoms_queried?: string[];
   patient_context?: any;
-  system_prompt?: string | null;
-  user_prompt?: string | null;
   ai_response: string;
   raw_ai_response?: string | null;
   structured_analysis?: any;
