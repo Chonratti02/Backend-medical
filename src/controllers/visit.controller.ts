@@ -134,16 +134,15 @@ export const getQueue = async (req: Request, res: Response, next: NextFunction):
              p.nationality,
              p.lunar_phase as birth_lunar_phase, p.lunar_day as birth_lunar_day,
              d.full_name as doctor_name, d.license_link as doctor_license,
-             COALESCE(
+              COALESCE(
                 (SELECT json_agg(json_build_object(
                   'id', pr.id,
                   'prescription_no', pr.prescription_no,
                   'herbs', pr.herbs,
-                  'ai_assessment_id', pr.ai_assessment_id,
                   'notes', pr.notes
                 )) FROM prescriptions pr WHERE pr.visit_id = v.id),
-               '[]'::json
-             ) as prescriptions,
+                '[]'::json
+              ) as prescriptions,
              (SELECT json_build_object(
                'ai_response', a.ai_response,
                'references_used', a.references_used,
