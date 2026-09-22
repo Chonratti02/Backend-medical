@@ -350,33 +350,40 @@ export async function getCanonicalKnowledge(): Promise<{
   return { herbs: cachedHerbs, diseases: cachedDiseases };
 }
 
-/** ค้นหา Chunks จาก PostgreSQL ด้วย Vector Cosine Similarity และ Keyword Match แบบกระจายครอบคลุมทุกคัมภีร์ในหมวด 'สมุนไพร' */
+/** ค้นหา Chunks จาก PostgreSQL ด้วย Vector Cosine Similarity และ Keyword Match แบบกระจายครอบคลุมคัมภีร์ตามหมวดที่ระบุ */
 async function searchChunksForSymptom(
   symptom: string,
   limit = 6,
+  category: "โรค" | "สมุนไพร" | "all" = "all",
 ): Promise<any[]> {
   let rows: any[] = [];
   try {
-    // 1. Vector Cosine Distance จาก pgvector (ดึงกระจายจากทุกคัมภีร์ที่ is_active = TRUE ในหมวด 'สมุนไพร')
+    const catCondition = category === "all" ? "" : "AND ku.category = $3";
+
+    // 1. Vector Cosine Distance จาก pgvector (ดึงกระจายจากทุกคัมภีร์ที่ is_active = TRUE ตามหมวดที่กำหนด)
     const queryEmbedding = await getEmbedding(symptom);
     if (queryEmbedding && queryEmbedding.length === 768) {
       const vectorStr = `[${queryEmbedding.join(",")}]`;
       const vecQuery = `
         WITH RankedChunks AS (
-          SELECT kc.id, kc.content, ku.title, ku.id AS upload_id,
+          SELECT kc.id, kc.content, ku.title, ku.id AS upload_id, ku.category,
                  1 - (kc.embedding <=> $1) AS similarity,
                  ROW_NUMBER() OVER (PARTITION BY ku.id ORDER BY kc.embedding <=> $1) as rank
           FROM knowledge_chunks kc
           JOIN knowledge_uploads ku ON kc.upload_id = ku.id
-          WHERE ku.is_active = TRUE AND ku.category = 'สมุนไพร' AND kc.embedding IS NOT NULL
+          WHERE ku.is_active = TRUE ${catCondition} AND kc.embedding IS NOT NULL
         )
-        SELECT id, content, title, similarity, upload_id
+        SELECT id, content, title, similarity, upload_id, category
         FROM RankedChunks
         WHERE rank <= 3 AND similarity >= 0.55
         ORDER BY rank ASC, similarity DESC
         LIMIT $2
       `;
-      const vecRes = await pool.query(vecQuery, [vectorStr, limit]);
+      const vecParams =
+        category === "all"
+          ? [vectorStr, limit]
+          : [vectorStr, limit, category];
+      const vecRes = await pool.query(vecQuery, vecParams);
       rows = vecRes.rows;
     }
 
@@ -385,22 +392,23 @@ async function searchChunksForSymptom(
       const cleanSym = symptom.trim();
       const kwQuery = `
         WITH KwRanked AS (
-          SELECT kc.id, kc.content, ku.title, ku.id AS upload_id,
+          SELECT kc.id, kc.content, ku.title, ku.id AS upload_id, ku.category,
                  0.85 AS similarity,
                  ROW_NUMBER() OVER (PARTITION BY ku.id ORDER BY kc.id) as rank
           FROM knowledge_chunks kc
           JOIN knowledge_uploads ku ON kc.upload_id = ku.id
-          WHERE ku.is_active = TRUE AND ku.category = 'สมุนไพร' AND kc.content ILIKE $1
+          WHERE ku.is_active = TRUE ${catCondition} AND kc.content ILIKE $1
         )
-        SELECT id, content, title, similarity, upload_id
+        SELECT id, content, title, similarity, upload_id, category
         FROM KwRanked
         WHERE rank <= 2
         LIMIT $2
       `;
-      const kwRes = await pool.query(kwQuery, [
-        `%${cleanSym}%`,
-        limit - rows.length,
-      ]);
+      const kwParams =
+        category === "all"
+          ? [`%${cleanSym}%`, limit - rows.length]
+          : [`%${cleanSym}%`, limit - rows.length, category];
+      const kwRes = await pool.query(kwQuery, kwParams);
 
       for (const r of kwRes.rows) {
         if (!rows.some((existing) => existing.id === r.id)) {
@@ -410,7 +418,7 @@ async function searchChunksForSymptom(
     }
   } catch (err: any) {
     console.error(
-      `❌ Vector/keyword search error for symptom "${symptom}":`,
+      `❌ Vector/keyword search error for symptom "${symptom}" (category: ${category}):`,
       err.message,
     );
   }
@@ -711,11 +719,17 @@ export const ragService = {
       symptomList = ["อาการไม่ระบุชัดเจน"];
     }
 
-    // 2. ดึง Chunks สำหรับแต่ละอาการแบบขนาน (Parallel) เพื่อลดเวลาประมวลผล
+    // 2. ดึง Chunks สำหรับแต่ละอาการแบบขนาน (Parallel):
+    //    - diseaseChunks: ดึงจากหมวด 'โรค' สำหรับการวิเคราะห์และวินิจฉัยโรคใน probable_diseases
+    //    - herbChunks: ดึงจากหมวด 'สมุนไพร' (Doc 3 & Doc 5) สำหรับการคัดเลือกและแนะนำสมุนไพรเดี่ยวใน symptoms_analysis.herbs
     const perSymptomData = await Promise.all(
       symptomList.map(async (sym) => {
-        const chunks = await searchChunksForSymptom(sym, 6);
-        return { symptom: sym, chunks };
+        const [diseaseChunks, herbChunks] = await Promise.all([
+          searchChunksForSymptom(sym, 4, "โรค"),
+          searchChunksForSymptom(sym, 8, "สมุนไพร"),
+        ]);
+        const chunks = [...diseaseChunks, ...herbChunks];
+        return { symptom: sym, diseaseChunks, herbChunks, chunks };
       }),
     );
 
@@ -723,7 +737,7 @@ export const ragService = {
     const refKeySet = new Set<string>();
 
     for (const item of perSymptomData) {
-      for (const c of item.chunks) {
+      for (const c of [...item.diseaseChunks, ...item.herbChunks]) {
         const key = c.title || "คัมภีร์การแพทย์แผนไทย";
         if (!refKeySet.has(key)) {
           refKeySet.add(key);
@@ -873,13 +887,26 @@ ${samutthanaCalcFormatted}
     perSymptomData.forEach((item, idx) => {
       chunksSection += `\n\n========================================\n`;
       chunksSection += `[อาการที่ ${idx + 1}]: "${item.symptom}"\n`;
-      if (item.chunks.length === 0) {
-        chunksSection += `[สถานะคลังข้อมูล]: ไม่พบคัมภีร์หรือข้อความที่เกี่ยวข้องกับอาการนี้ในฐานข้อมูล\n`;
+
+      // 1. คลังข้อมูลคัมภีร์หมวด 'โรค'
+      chunksSection += `\n[ก. คลังข้อมูลคัมภีร์หมวด 'โรค' (ใช้สำหรับวิเคราะห์และวินิจฉัยโรคใน probable_diseases)]:\n`;
+      if (item.diseaseChunks.length === 0) {
+        chunksSection += `- ไม่พบคัมภีร์หมวดโรคที่เกี่ยวข้องโดยตรงกับอาการนี้\n`;
       } else {
-        chunksSection += `[คลังข้อมูลคัมภีร์ที่สืบค้นพบจากฐานข้อมูล (${item.chunks.length} ชิ้น)]:\n`;
-        item.chunks.forEach((c, cIdx) => {
-          const scripture = c.title || "คัมภีร์การแพทย์แผนไทย";
-          chunksSection += `--- ชิ้นที่ ${cIdx + 1} (คัมภีร์: ${scripture}) ---\n${c.content.trim().slice(0, 600)}\n`;
+        item.diseaseChunks.forEach((c, cIdx) => {
+          const scripture = c.title || "คัมภีร์การแพทย์แผนไทย (โรค)";
+          chunksSection += `--- เอกสารโรค ชิ้นที่ ${cIdx + 1} (${scripture}) ---\n${c.content.trim().slice(0, 600)}\n`;
+        });
+      }
+
+      // 2. คลังข้อมูลคัมภีร์หมวด 'สมุนไพร'
+      chunksSection += `\n[ข. คลังข้อมูลคัมภีร์หมวด 'สมุนไพร' (ใช้สำหรับคัดเลือกสมุนไพรเดี่ยวประจำอาการใน symptoms_analysis.herbs)]:\n`;
+      if (item.herbChunks.length === 0) {
+        chunksSection += `- ไม่พบคัมภีร์หมวดสมุนไพรที่เกี่ยวข้องโดยตรงกับอาการนี้\n`;
+      } else {
+        item.herbChunks.forEach((c, cIdx) => {
+          const scripture = c.title || "คัมภีร์การแพทย์แผนไทย (สมุนไพร)";
+          chunksSection += `--- เอกสารสมุนไพร ชิ้นที่ ${cIdx + 1} (${scripture}) ---\n${c.content.trim().slice(0, 600)}\n`;
         });
       }
     });
@@ -894,8 +921,15 @@ ${chunksSection}
 
 โปรดประเมินอาการแต่ละข้อตามคลังข้อมูลคัมภีร์/เอกสาร (Doc) ที่ให้มาเท่านั้น โดยให้:
 1. "patient_summary": สรุปข้อมูลผู้ป่วย (ชื่อ, อายุ, เพศ, น้ำหนัก, ส่วนสูง, อุณหภูมิ, ความดันโลหิต, ชีพจร, ประวัติแพ้ยา, โรคประจำตัว, สูบบุหรี่, ดื่มสุรา, ธาตุเจ้าเรือน, สรุปอุตุสมุฏฐาน, สรุปกาลสมุฏฐาน) จากข้อมูลที่ได้รับ
-2. "probable_diseases": วินิจฉัยโรคที่คาดว่าผู้ป่วยจะเป็นจากข้อมูลที่มีและสอดคล้องกับคัมภีร์/เอกสาร (Doc) ที่สืบค้นพบ (ระบุโรคที่มีโอกาสเป็นไปได้ 1 ถึง 3 โรค โดยเรียงลำดับจากความน่าจะเป็นสูงที่สุดลงมา พร้อมระบุระดับ เช่น สูง, ปานกลาง, น้อย เพื่อช่วยแพทย์ในการวินิจฉัยแยกโรค Differential Diagnosis) โดยระบุชื่อโรค disease_name ตามที่ปรากฏในเอกสารคัมภีร์/ตำรา พร้อมระดับความเป็นไปได้ (probability_level), สมุฏฐานเหตุแห่งโรค (primary_cause), ข้อมูลสนับสนุน (supporting_evidence), คำอธิบายการวินิจฉัยและการวิเคราะห์เชิงคลินิกอย่างละเอียด (clinical_explanation), และรหัสโรคหรือการจัดหมวดตามคัมภีร์ (icd10_or_ttm_code)
-3. "symptoms_analysis": วิเคราะห์แต่ละอาการและแนะนำสมุนไพรเฉพาะที่ระบุในเอกสารคัมภีร์ (Doc) ที่แนบมา สูงสุดไม่เกิน 13 ชนิดต่ออาการ/โรค (หรือเท่าที่มีบันทึกจริงในคัมภีร์ สูงสุดไม่เกิน 13 ชนิด หากอาการใดไม่พบคัมภีร์ ให้ has_knowledge: false และ herbs: []) โดยแต่ละสมุนไพรต้องระบุ: name (ชื่อตรงตามคัมภีร์ ห้ามคิดชื่อใหม่), taste (รสยาหลัก เช่น รสสุขุม รสขม รสเผ็ดร้อน), part_used (ส่วนที่ใช้ เช่น ราก ใบ ดอก เปลือกต้น), properties (สรรพคุณ), usage (วิธีใช้และขนาดรับประทาน), precautions (ข้อควรระวัง), source (แหล่งอ้างอิงชื่อคัมภีร์ตามที่ระบุใน Doc)
+2. "probable_diseases": วินิจฉัยโรคที่คาดว่าผู้ป่วยจะเป็นจากข้อมูลที่มีและสอดคล้องกับ [ก. คลังข้อมูลคัมภีร์หมวด 'โรค'] ที่สืบค้นพบ (ระบุโรคที่มีโอกาสเป็นไปได้ 1 ถึง 3 โรค โดยเรียงลำดับจากความน่าจะเป็นสูงที่สุดลงมา พร้อมระบุระดับ เช่น สูง, ปานกลาง, น้อย เพื่อช่วยแพทย์ในการวินิจฉัยแยกโรค Differential Diagnosis) โดยระบุชื่อโรค disease_name ตามที่ปรากฏในเอกสารคัมภีร์หมวดโรค พร้อมระดับความเป็นไปได้ (probability_level), สมุฏฐานเหตุแห่งโรค (primary_cause), ข้อมูลสนับสนุน (supporting_evidence), คำอธิบายการวินิจฉัยและการวิเคราะห์เชิงคลินิกอย่างละเอียด (clinical_explanation), และรหัสโรคหรือการจัดหมวดตามคัมภีร์ (icd10_or_ttm_code)
+3. "symptoms_analysis": วิเคราะห์แต่ละอาการและแนะนำสมุนไพรเดี่ยวประจำอาการ โดยต้องคัดเลือกจาก [ข. คลังข้อมูลคัมภีร์หมวด 'สมุนไพร'] (เช่น ข้อมูลส่วนที่ 3 ส่วนของการคัดแยกสมุนไพรในการรักษาแต่ละอาการ และข้อมูลส่วนที่ 5) เท่านั้น สูงสุดไม่เกิน 13 ชนิดต่ออาการ/โรค (หรือเท่าที่มีบันทึกจริงในคัมภีร์ หากอาการใดไม่พบคัมภีร์ ให้ has_knowledge: false และ herbs: []) โดยแต่ละสมุนไพรต้องระบุ:
+   - name: ชื่อสมุนไพรเดี่ยวตรงตามคัมภีร์หมวดสมุนไพรเท่านั้น (เช่น กกลังกา, ขัดมอน, มะตูมอ่อน, ผักชี, บัวหลวง, สารส้ม, ดินประสิว ฯลฯ **ข้อห้ามเด็ดขาด: ห้ามนำชื่อตำรับยาจากหมวดโรค เช่น 'ตำรับยาแก้มุตกิต', 'ตำรับยารากไทรย้อยและไพลดำ', 'ยาชื่อ อัพยาธิคุณ' มาใส่ในช่องสมุนไพรเดี่ยว**)
+   - taste: รสยาหลักตามที่ระบุในคัมภีร์สมุนไพร เช่น รสจืดเย็น, รสเผ็ดร้อน, รสฝาดเปรี้ยว (หรือระบุตามคัมภีร์)
+   - part_used: ส่วนของพืชหรือวัตถุธาตุที่ใช้ เช่น ต้น, ราก, ใบ, ดอก, ผลึก
+   - properties: สรรพคุณตามคัมภีร์สมุนไพร
+   - usage: วิธีใช้และขนาดรับประทาน
+   - precautions: ข้อควรระวัง
+   - source: แหล่งอ้างอิงชื่อคัมภีร์ตามที่ระบุใน Doc หมวดสมุนไพร (เช่น ข้อมูลส่วนที่ 3 ส่วนของการคัดแยกสมุนไพรในการรักษาแต่ละอาการ)
 
 คำเตือนสำคัญ: ห้ามใส่ข้อความเกริ่นนำ ข้อความทักทาย หรือสรุปปิดท้ายใดๆ ทั้งสิ้น ให้ตอบกลับเฉพาะ JSON object ที่สมบูรณ์ตาม Schema ด้านล่างเท่านั้น เริ่มต้นด้วย { และปิดท้ายด้วย }
 {

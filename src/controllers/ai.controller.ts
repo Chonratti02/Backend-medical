@@ -552,7 +552,7 @@ export const uploadDocument = async (req: Request, res: Response, next: NextFunc
     }
 
     const title = (req.body['title'] as string)?.trim() || originalname;
-    const category = (req.body['category'] as string)?.trim() || 'คัมภีร์แพทย์แผนไทย';
+    const category = (req.body['category'] as string)?.trim() || 'โรค';
     const uploadedBy = (req as any).user?.id || null;
 
     // 2. บันทึก Metadata และเนื้อหาดิบลงใน knowledge_uploads
