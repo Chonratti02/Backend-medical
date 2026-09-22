@@ -140,8 +140,6 @@ CREATE TABLE IF NOT EXISTS ai_assessments (
     query_text TEXT NOT NULL,                                   -- ข้อความคำถามหรือข้อมูลอาการที่ส่งให้ AI วิเคราะห์
     symptoms_queried JSONB DEFAULT '[]'::jsonb,                 -- รายการอาการที่ส่งวิเคราะห์ (JSONB array)
     patient_context JSONB DEFAULT NULL,                         -- ข้อมูลบริบทคนไข้ (อายุ, ธาตุ, สัญญาณชีพ, ประวัติแพ้ยา)
-    system_prompt TEXT DEFAULT NULL,                            -- System Prompt ที่ส่งให้ AI
-    user_prompt TEXT DEFAULT NULL,                              -- User Prompt จริงรวม Chunks
     ai_response TEXT NOT NULL,                                  -- ข้อความผลวิเคราะห์จาก AI
     raw_ai_response TEXT DEFAULT NULL,                          -- Raw Response จาก AI
     structured_analysis JSONB DEFAULT NULL,                     -- JSON วิเคราะห์แยกหมวดหมู่ (probable_diseases, symptoms_analysis, precautions)
