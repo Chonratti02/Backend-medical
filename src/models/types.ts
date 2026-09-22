@@ -155,9 +155,9 @@ export interface AiAssessment {
 
 export interface PrescriptionHerb {
   name: string;
-  amount: number;
-  unit: string;
-  note?: string;
+  role: string;
+  role_name: string;
+  detail?: string | null;
 }
 
 export interface Prescription {
@@ -167,12 +167,6 @@ export interface Prescription {
   ai_assessment_id?: number | null;
   prescription_no: string;
   herbs: PrescriptionHerb[];
-  preparation?: string | null;
-  usage_instruction: string;
-  duration_days: number;
-  status: PrescriptionStatus;
-  pharmacist_id?: number | null;
-  dispensed_at?: Date | null;
   notes?: string | null;
   created_at: Date;
   updated_at: Date;

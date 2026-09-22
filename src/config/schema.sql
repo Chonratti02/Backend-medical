@@ -172,20 +172,12 @@ CREATE TABLE IF NOT EXISTS prescriptions (
     ai_assessment_id INT DEFAULT NULL REFERENCES ai_assessments(id) ON DELETE SET NULL, -- ผลวิเคราะห์ AI ที่อ้างอิง
     prescription_no VARCHAR(50) NOT NULL UNIQUE,                -- เลขที่ใบสั่งยา (Unique)
     herbs JSONB NOT NULL,                                       -- รายการสมุนไพรและขนาดการใช้ในรูปแบบ JSONB
-    preparation TEXT DEFAULT NULL,                              -- วิธีการปรุงยาหรือวิธีเตรียมยา
-    usage_instruction TEXT NOT NULL,                            -- วิธีการรับประทานยา / ข้อบ่งใช้
-    duration_days INT NOT NULL DEFAULT 7,                       -- ระยะเวลารับประทานยา (วัน)
-    status VARCHAR(20) NOT NULL DEFAULT 'pending'               -- สถานะใบสั่งยา
-        CHECK (status IN ('pending', 'dispensed', 'cancelled')),
-    pharmacist_id INT DEFAULT NULL REFERENCES staff(id) ON DELETE SET NULL, -- รหัสเภสัชกร / ผู้จ่ายยา FK -> staff(id)
-    dispensed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,         -- วัน-เวลาที่จ่ายยา
     notes TEXT DEFAULT NULL,                                    -- หมายเหตุเพิ่มเติม
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_prescriptions_visit_id ON prescriptions(visit_id);
-CREATE INDEX IF NOT EXISTS idx_prescriptions_status ON prescriptions(status);
 
 -- ------------------------------------------------------------
 -- 6. ตารางคลังความรู้สมุนไพรและคัมภีร์แพทย์แผนไทย (Herbal Knowledge)

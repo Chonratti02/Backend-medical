@@ -135,16 +135,13 @@ export const getQueue = async (req: Request, res: Response, next: NextFunction):
              p.lunar_phase as birth_lunar_phase, p.lunar_day as birth_lunar_day,
              d.full_name as doctor_name, d.license_link as doctor_license,
              COALESCE(
-               (SELECT json_agg(json_build_object(
-                 'id', pr.id,
-                 'prescription_no', pr.prescription_no,
-                 'herbs', pr.herbs,
-                 'preparation', pr.preparation,
-                 'usage_instruction', pr.usage_instruction,
-                 'duration_days', pr.duration_days,
-                 'status', pr.status,
-                 'notes', pr.notes
-               )) FROM prescriptions pr WHERE pr.visit_id = v.id),
+                (SELECT json_agg(json_build_object(
+                  'id', pr.id,
+                  'prescription_no', pr.prescription_no,
+                  'herbs', pr.herbs,
+                  'ai_assessment_id', pr.ai_assessment_id,
+                  'notes', pr.notes
+                )) FROM prescriptions pr WHERE pr.visit_id = v.id),
                '[]'::json
              ) as prescriptions,
              (SELECT json_build_object(
@@ -221,8 +218,7 @@ export const update = async (req: Request, res: Response, next: NextFunction): P
       chief_complaint, clinical_history, physical_exam, ttm_exam, ai_assessment,
       illness_start_date, illness_start_time, illness_days,
       utu_samutthana, kala_samutthana, tridhatu_samutthana,
-      preparation, usage_instruction, duration_days, notes, prescription_notes,
-      prescription_preparation, prescription_duration_days, prescription_usage_instruction
+      notes, prescription_notes, ai_assessment_id
     } = req.body;
     const visitId = req.params['id'];
     const dbIllnessStartDate = parseDateForDb(illness_start_date);
@@ -266,7 +262,39 @@ export const update = async (req: Request, res: Response, next: NextFunction): P
       ]
     );
 
-    // บันทึกรายการยาสมุนไพรลงตาราง prescriptions เพื่อผูกกับรอบการตรวจจริง
+    // 1. บันทึกผลวิเคราะห์ AI ลงตาราง ai_assessments เพื่อนำมาแสดงใน History และเชื่อมโยง id
+    let createdAiAssessmentId: number | null = ai_assessment_id ? Number(ai_assessment_id) : null;
+    if (ai_assessment) {
+      try {
+        const aiResponse = ai_assessment.ai_response || (typeof ai_assessment === 'string' ? ai_assessment : '');
+        const aiRefs = ai_assessment.references_used || [];
+        const aiHerbs = ai_assessment.recommended_herbs || [];
+        if (aiResponse) {
+          const aiInsert = await db.query(
+            `INSERT INTO ai_assessments
+              (visit_id, query_text, ai_response, references_used, recommended_herbs, confidence_score, model_used)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             RETURNING id`,
+            [
+              visitId,
+              chief_complaint || 'ตรวจวินิจฉัยโรค',
+              aiResponse,
+              JSON.stringify(aiRefs),
+              JSON.stringify(aiHerbs),
+              0.95,
+              'gemini-1.5-flash'
+            ]
+          );
+          if (!createdAiAssessmentId && aiInsert.rows.length > 0) {
+            createdAiAssessmentId = aiInsert.rows[0].id;
+          }
+        }
+      } catch (aiErr) {
+        console.warn('⚠️ Could not insert into ai_assessments:', aiErr);
+      }
+    }
+
+    // 2. บันทึกรายการยาสมุนไพรลงตาราง prescriptions เพื่อผูกกับรอบการตรวจจริง
     let createdPrescription: any = null;
     const herbList = herbs || prescriptions;
     if (herbList && Array.isArray(herbList) && herbList.length > 0) {
@@ -278,27 +306,20 @@ export const update = async (req: Request, res: Response, next: NextFunction): P
         const seq = String(parseInt(countResult.rows[0]?.count || '0', 10) + 1).padStart(3, '0');
         const prescriptionNo = `RX-${today}-${seq}-${Date.now().toString().slice(-4)}`;
         const effectiveDocId = doctor_id ?? (req.user?.id || 1);
-
-        const prep = preparation || prescription_preparation || 'ยาต้ม/ยาผง/ยาสมุนไพรตำรับแผนไทย';
-        const usage = usage_instruction || prescription_usage_instruction || 'รับประทานตามคำแนะนำของแพทย์ผู้ตรวจ';
-        const duration = Number(duration_days || prescription_duration_days || 7);
-        const pNotes = prescription_notes || notes || 'บันทึกสั่งจ่ายยาสำเร็จจากห้องตรวจแพทย์';
+        const pNotes = notes || prescription_notes || null;
 
         const rxInsert = await db.query(
           `INSERT INTO prescriptions
-            (visit_id, doctor_id, prescription_no, herbs, preparation, usage_instruction, duration_days, status, notes)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            (visit_id, doctor_id, prescription_no, herbs, notes, ai_assessment_id)
+           VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING *`,
           [
             visitId,
             effectiveDocId,
             prescriptionNo,
             JSON.stringify(herbList),
-            prep,
-            usage,
-            duration,
-            'dispensed',
-            pNotes
+            pNotes,
+            createdAiAssessmentId
           ]
         );
         if (rxInsert.rows.length > 0) {
@@ -306,33 +327,6 @@ export const update = async (req: Request, res: Response, next: NextFunction): P
         }
       } catch (rxErr) {
         console.warn('⚠️ Could not insert into prescriptions:', rxErr);
-      }
-    }
-
-    // บันทึกผลวิเคราะห์ AI ลงตาราง ai_assessments เพื่อนำมาแสดงใน History
-    if (ai_assessment) {
-      try {
-        const aiResponse = ai_assessment.ai_response || (typeof ai_assessment === 'string' ? ai_assessment : '');
-        const aiRefs = ai_assessment.references_used || [];
-        const aiHerbs = ai_assessment.recommended_herbs || [];
-        if (aiResponse) {
-          await db.query(
-            `INSERT INTO ai_assessments
-              (visit_id, query_text, ai_response, references_used, recommended_herbs, confidence_score, model_used)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [
-              visitId,
-              chief_complaint || 'ตรวจวินิจฉัยโรค',
-              aiResponse,
-              JSON.stringify(aiRefs),
-              JSON.stringify(aiHerbs),
-              0.95,
-              'gemini-1.5-flash'
-            ]
-          );
-        }
-      } catch (aiErr) {
-        console.warn('⚠️ Could not insert into ai_assessments:', aiErr);
       }
     }
 
