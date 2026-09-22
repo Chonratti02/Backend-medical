@@ -51,6 +51,7 @@ export interface Patient {
   chronic_disease?: string | null;
 
   // การแพทย์แผนไทย และจักราศีสมุฏฐาน
+  geography?: string | null;
   lunar_birthday?: string | null;
   lunar_phase?: LunarPhase | null;
   lunar_day?: number | null;
@@ -173,36 +174,16 @@ export interface Prescription {
 export interface HerbalKnowledge {
   id: number;
   herb_name: string;
-  herb_name_th?: string;
-  herb_name_en?: string | null;
-  herb_name_sci?: string | null;
   part_used?: string | null;
   taste?: string | null;
   properties?: string | null;
-  category?: string | null;
-  indications?: string | null;
-  contraindications?: string | null;
-  source_scripture?: string | null;
-  source_page?: string | null;
   created_at?: Date;
   updated_at?: Date;
 }
 
 export interface Disease {
   id: number;
-  code: string;
-  name_th: string;
-  name_en?: string | null;
-  category: 'ttm' | 'icd10' | 'general';
-  samutthana?: string | null;
-  body_element?: string | null;
-  source_scripture?: string | null;
-  description?: string | null;
-  symptoms?: string | null;
-  recommended_treatment?: string | null;
-  is_active: boolean;
-  created_at: Date;
-  updated_at: Date;
+  disease_name: string;
 }
 
 export interface VisitDiagnosis {

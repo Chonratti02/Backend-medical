@@ -139,16 +139,25 @@ export const getQueue = async (req: Request, res: Response, next: NextFunction):
                   'id', pr.id,
                   'prescription_no', pr.prescription_no,
                   'herbs', pr.herbs,
+                  'ai_assessment_id', pr.ai_assessment_id,
                   'notes', pr.notes
                 )) FROM prescriptions pr WHERE pr.visit_id = v.id),
                 '[]'::json
               ) as prescriptions,
-             (SELECT json_build_object(
-               'ai_response', a.ai_response,
-               'references_used', a.references_used,
-               'recommended_herbs', a.recommended_herbs,
-               'confidence_score', a.confidence_score
-             ) FROM ai_assessments a WHERE a.visit_id = v.id ORDER BY a.created_at DESC LIMIT 1) as ai_assessment
+              (SELECT json_build_object(
+                'id', a.id,
+                'ai_response', a.ai_response,
+                'structured_analysis', a.structured_analysis,
+                'references_used', a.references_used,
+                'recommended_herbs', a.recommended_herbs,
+                'confidence_score', a.confidence_score,
+                'is_accepted_by_doctor', a.is_accepted_by_doctor,
+                'doctor_feedback', a.doctor_feedback,
+                'symptoms_queried', a.symptoms_queried,
+                'created_at', a.created_at
+              ) FROM ai_assessments a 
+              WHERE a.visit_id = v.id OR (a.patient_id = v.patient_id AND a.created_at::date = v.visit_date::date)
+              ORDER BY a.created_at DESC LIMIT 1) as ai_assessment
       FROM visits v
       JOIN patients p ON v.patient_id = p.id
       LEFT JOIN staff d ON v.doctor_id = d.id

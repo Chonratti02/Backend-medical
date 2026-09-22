@@ -428,6 +428,39 @@ export const analyze = async (req: Request, res: Response, next: NextFunction): 
 };
 
 /**
+ * GET /api/v1/ai/assessments/latest
+ * ดึงผลการประเมิน AI ล่าสุดตาม visit_id หรือ patient_id + วันที่ตรวจ
+ */
+export const getLatestAssessment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { patient_id, visit_id, date } = req.query;
+    let query = 'SELECT * FROM ai_assessments WHERE 1=1';
+    const params: any[] = [];
+
+    if (visit_id) {
+      params.push(visit_id);
+      query += ` AND visit_id = $${params.length}`;
+    } else if (patient_id && date) {
+      params.push(patient_id);
+      params.push(date);
+      query += ` AND patient_id = $1 AND created_at::date = $2::date`;
+    } else if (patient_id) {
+      params.push(patient_id);
+      query += ` AND patient_id = $1`;
+    } else {
+      res.status(400).json({ success: false, message: 'Missing patient_id or visit_id' });
+      return;
+    }
+
+    query += ' ORDER BY created_at DESC LIMIT 1';
+    const { rows } = await db.query(query, params);
+    res.json({ success: true, data: rows[0] || null });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * GET /api/v1/ai/assessments/:visitId
  */
 export const getByVisit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {

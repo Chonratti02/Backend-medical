@@ -8,8 +8,11 @@ const router = Router();
 router.post('/', optionalAuthenticate, aiController.analyze);
 router.post('/analyze', optionalAuthenticate, aiController.analyze);
 
+// GET  /api/v1/ai/assessments/latest (ดึงผลวิเคราะห์ล่าสุดตาม visit_id หรือ patient_id + วันที่)
+router.get('/assessments/latest', optionalAuthenticate, aiController.getLatestAssessment);
+
 // GET  /api/v1/ai/assessments/:visitId
-router.get('/assessments/:visitId', authenticate, aiController.getByVisit);
+router.get('/assessments/:visitId', optionalAuthenticate, aiController.getByVisit);
 
 // PATCH /api/v1/ai/assessments/:id/feedback (บันทึกความเห็นของแพทย์)
 router.patch('/assessments/:id/feedback', authenticate, aiController.updateAssessmentFeedback);

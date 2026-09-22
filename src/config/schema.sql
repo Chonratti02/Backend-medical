@@ -185,7 +185,9 @@ CREATE TABLE IF NOT EXISTS herbal_knowledge (
     herb_name VARCHAR(100) NOT NULL,                            -- ชื่อสมุนไพร
     part_used VARCHAR(150) DEFAULT NULL,                        -- ส่วนที่ใช้ทำยา (เช่น ราก, ใบ, ดอก, ผล, เปลือกต้น, แก่น, หัว, เหง้า, ทั้งต้น)
     taste VARCHAR(150) DEFAULT NULL,                            -- รสยาตามคัมภีร์เภสัชกรรมไทย (เช่น รสเผ็ดร้อน, รสขม, รสหวาน, รสฝาด, รสเปรี้ยว, รสเค็ม, รสหอมเย็น, รสเมาเบื่อ, รสมัน, รสจืด)
-    properties TEXT DEFAULT NULL                                -- สรรพคุณทางยาในการบำบัดรักษาโรคหรืออาการตามคัมภีร์แพทย์แผนไทย
+    properties TEXT DEFAULT NULL,                               -- สรรพคุณทางยาในการบำบัดรักษาโรคหรืออาการตามคัมภีร์แพทย์แผนไทย
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_herb_th ON herbal_knowledge(herb_name);
