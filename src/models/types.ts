@@ -280,7 +280,7 @@ export interface HerbAnalysisItem {
 
 export interface ProbableDiseaseItem {
   disease_name: string; // ชื่อโรค เช่น "โรคมุตรกฤจฉ์ (ทางเดินปัสสาวะอักเสบ/ขัดเบา)"
-  probability_level: string; // เช่น "สูงมาก (High)", "สูง (High)", "ปานกลาง (Moderate)", "ต้องเฝ้าระวัง (Possible)"
+  probability_level: string; // เช่น "85%", "65%", "45%" (หรือข้อความระดับเดิม เช่น "สูง", "ปานกลาง")
   primary_cause: string; // สมุฏฐานเหตุแห่งโรค เช่น "ปิตตะและเสมหะระคนในระบบทางเดินปัสสาวะ"
   supporting_evidence: string; // ข้อมูลสนับสนุนจากอาการ ธาตุเจ้าเรือน เวลาเกิด อายุ หรือกาลสมุฏฐาน
   clinical_explanation?: string; // คำอธิบายการวินิจฉัยและการวิเคราะห์เชิงคลินิกอย่างละเอียด
