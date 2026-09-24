@@ -452,7 +452,7 @@ export const getLatestAssessment = async (req: Request, res: Response, next: Nex
       return;
     }
 
-    query += ' ORDER BY created_at DESC LIMIT 1';
+    query += ' ORDER BY (structured_analysis IS NOT NULL) DESC, created_at DESC LIMIT 1';
     const { rows } = await db.query(query, params);
     res.json({ success: true, data: rows[0] || null });
   } catch (err) {
@@ -466,7 +466,7 @@ export const getLatestAssessment = async (req: Request, res: Response, next: Nex
 export const getByVisit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { rows } = await db.query(
-      'SELECT * FROM ai_assessments WHERE visit_id = $1 ORDER BY created_at DESC',
+      'SELECT * FROM ai_assessments WHERE visit_id = $1 ORDER BY (structured_analysis IS NOT NULL) DESC, created_at DESC',
       [req.params['visitId']]
     );
     res.json({ success: true, data: rows });

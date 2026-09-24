@@ -238,12 +238,14 @@ export const create = async (
     }
 
     let zodiacCalc = null;
+    const normalizedLunarMonth =
+      effectiveLunarMonth === 88 ? 8 : effectiveLunarMonth;
     if (
-      effectiveLunarMonth &&
-      effectiveLunarMonth >= 1 &&
-      effectiveLunarMonth <= 12
+      normalizedLunarMonth &&
+      normalizedLunarMonth >= 1 &&
+      normalizedLunarMonth <= 12
     ) {
-      zodiacCalc = calculateZodiacSamutthana(lunar.phase, effectiveLunarMonth);
+      zodiacCalc = calculateZodiacSamutthana(lunar.phase, normalizedLunarMonth);
     }
 
     const effBirthZodiac = birth_zodiac ?? zodiacCalc?.birthZodiac ?? null;

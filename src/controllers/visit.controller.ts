@@ -157,7 +157,7 @@ export const getQueue = async (req: Request, res: Response, next: NextFunction):
                 'created_at', a.created_at
               ) FROM ai_assessments a 
               WHERE a.visit_id = v.id OR (a.patient_id = v.patient_id AND a.created_at::date = v.visit_date::date)
-              ORDER BY a.created_at DESC LIMIT 1) as ai_assessment
+              ORDER BY (a.structured_analysis IS NOT NULL) DESC, a.created_at DESC LIMIT 1) as ai_assessment
       FROM visits v
       JOIN patients p ON v.patient_id = p.id
       LEFT JOIN staff d ON v.doctor_id = d.id
@@ -209,7 +209,7 @@ export const getById = async (req: Request, res: Response, next: NextFunction): 
 
     if (!rows.length) { res.status(404).json({ success: false, message: 'ไม่พบข้อมูลการรักษา' }); return; }
 
-    const assessments = await db.query('SELECT * FROM ai_assessments WHERE visit_id = $1 ORDER BY created_at DESC', [req.params['id']]);
+    const assessments = await db.query('SELECT * FROM ai_assessments WHERE visit_id = $1 ORDER BY (structured_analysis IS NOT NULL) DESC, created_at DESC', [req.params['id']]);
     const prescriptions = await db.query('SELECT * FROM prescriptions   WHERE visit_id = $1 ORDER BY created_at DESC', [req.params['id']]);
 
     res.json({
@@ -226,7 +226,8 @@ export const update = async (req: Request, res: Response, next: NextFunction): P
       chief_complaint, clinical_history, physical_exam, ttm_exam, ai_assessment,
       illness_start_date, illness_start_time, illness_days,
       utu_samutthana, kala_samutthana, tridhatu_samutthana,
-      notes, prescription_notes, ai_assessment_id
+      notes, prescription_notes, ai_assessment_id,
+      preparation, usage_instruction, duration_days
     } = req.body;
     const visitId = req.params['id'];
     const dbIllnessStartDate = parseDateForDb(illness_start_date);
@@ -270,35 +271,57 @@ export const update = async (req: Request, res: Response, next: NextFunction): P
       ]
     );
 
-    // 1. บันทึกผลวิเคราะห์ AI ลงตาราง ai_assessments เพื่อนำมาแสดงใน History และเชื่อมโยง id
+    // 1. ตรวจสอบและเชื่อมโยงผลวิเคราะห์ AI ลงตาราง ai_assessments เพื่อนำมาแสดงใน History และ Prescription
     let createdAiAssessmentId: number | null = ai_assessment_id ? Number(ai_assessment_id) : null;
-    if (ai_assessment) {
+    if (createdAiAssessmentId) {
+      // มี assessment_id จากการกดวิเคราะห์ AI อยู่แล้ว ให้อัปเดต visit_id ผูกกับรอบตรวจนี้ (ไม่ insert ซ้ำ)
       try {
-        const aiResponse = ai_assessment.ai_response || (typeof ai_assessment === 'string' ? ai_assessment : '');
-        const aiRefs = ai_assessment.references_used || [];
-        const aiHerbs = ai_assessment.recommended_herbs || [];
-        if (aiResponse) {
-          const aiInsert = await db.query(
-            `INSERT INTO ai_assessments
-              (visit_id, query_text, ai_response, references_used, recommended_herbs, confidence_score, model_used)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
-             RETURNING id`,
-            [
-              visitId,
-              chief_complaint || 'ตรวจวินิจฉัยโรค',
-              aiResponse,
-              JSON.stringify(aiRefs),
-              JSON.stringify(aiHerbs),
-              0.95,
-              'gemini-1.5-flash'
-            ]
-          );
-          if (!createdAiAssessmentId && aiInsert.rows.length > 0) {
-            createdAiAssessmentId = aiInsert.rows[0].id;
+        await db.query(
+          'UPDATE ai_assessments SET visit_id = $1 WHERE id = $2 AND (visit_id IS NULL OR visit_id != $1)',
+          [visitId, createdAiAssessmentId]
+        );
+      } catch (linkErr) {
+        console.warn('⚠️ Could not link visit_id to ai_assessments:', linkErr);
+      }
+    } else {
+      // ตรวจสอบว่าใน visit นี้มี AI assessment ที่เคยสร้างไว้แล้วหรือไม่ โดยเลือกแถวที่มี structured_analysis ก่อน
+      const existingAi = await db.query(
+        'SELECT id FROM ai_assessments WHERE visit_id = $1 ORDER BY (structured_analysis IS NOT NULL) DESC, created_at DESC LIMIT 1',
+        [visitId]
+      );
+      if (existingAi.rows.length > 0) {
+        createdAiAssessmentId = existingAi.rows[0].id;
+      } else if (ai_assessment) {
+        // หากไม่มีแถวเดิมเลยและมี ai_assessment ส่งมา จึงค่อยสร้างแถวใหม่พร้อม structured_analysis (ถ้ามี)
+        try {
+          const aiResponse = ai_assessment.ai_response || (typeof ai_assessment === 'string' ? ai_assessment : '');
+          const aiRefs = ai_assessment.references_used || [];
+          const aiHerbs = ai_assessment.recommended_herbs || [];
+          const aiStruct = ai_assessment.structured_analysis || null;
+          if (aiResponse) {
+            const aiInsert = await db.query(
+              `INSERT INTO ai_assessments
+                (visit_id, query_text, ai_response, references_used, recommended_herbs, structured_analysis, confidence_score, model_used)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+               RETURNING id`,
+              [
+                visitId,
+                chief_complaint || 'ตรวจวินิจฉัยโรค',
+                aiResponse,
+                JSON.stringify(aiRefs),
+                JSON.stringify(aiHerbs),
+                aiStruct ? JSON.stringify(aiStruct) : null,
+                0.95,
+                'gemini-1.5-flash'
+              ]
+            );
+            if (aiInsert.rows.length > 0) {
+              createdAiAssessmentId = aiInsert.rows[0].id;
+            }
           }
+        } catch (aiErr) {
+          console.warn('⚠️ Could not insert into ai_assessments:', aiErr);
         }
-      } catch (aiErr) {
-        console.warn('⚠️ Could not insert into ai_assessments:', aiErr);
       }
     }
 
@@ -307,34 +330,102 @@ export const update = async (req: Request, res: Response, next: NextFunction): P
     const herbList = herbs || prescriptions;
     if (herbList && Array.isArray(herbList) && herbList.length > 0) {
       try {
-        const today = dayjs().format('YYYYMMDD');
-        const countResult = await db.query(
-          "SELECT COUNT(*) as count FROM prescriptions WHERE created_at::date = CURRENT_DATE"
-        );
-        const seq = String(parseInt(countResult.rows[0]?.count || '0', 10) + 1).padStart(3, '0');
-        const prescriptionNo = `RX-${today}-${seq}-${Date.now().toString().slice(-4)}`;
-        const effectiveDocId = doctor_id ?? (req.user?.id || 1);
-        const pNotes = notes || prescription_notes || null;
+        // ตรวจสอบความถูกต้องของ doctor_id ในตาราง staff เพื่อป้องกัน Foreign Key Error
+        let effectiveDocId: number | null = doctor_id ? Number(doctor_id) : (req.user?.id ? Number(req.user.id) : null);
+        if (effectiveDocId) {
+          const docCheck = await db.query('SELECT id FROM staff WHERE id = $1', [effectiveDocId]);
+          if (!docCheck.rows.length) {
+            effectiveDocId = null;
+          }
+        }
+        if (!effectiveDocId) {
+          const activeDoctor = await db.query(
+            "SELECT id FROM staff WHERE role = 'doctor' AND is_active = true ORDER BY id ASC LIMIT 1"
+          );
+          if (activeDoctor.rows.length > 0) {
+            effectiveDocId = activeDoctor.rows[0].id;
+          } else {
+            const anyStaff = await db.query('SELECT id FROM staff ORDER BY id ASC LIMIT 1');
+            effectiveDocId = anyStaff.rows[0]?.id || 1;
+          }
+        }
 
-        const rxInsert = await db.query(
-          `INSERT INTO prescriptions
-            (visit_id, doctor_id, prescription_no, herbs, notes, ai_assessment_id)
-           VALUES ($1, $2, $3, $4, $5, $6)
-           RETURNING *`,
-          [
-            visitId,
-            effectiveDocId,
-            prescriptionNo,
-            JSON.stringify(herbList),
-            pNotes,
-            createdAiAssessmentId
-          ]
+        // ตรวจสอบความถูกต้องของ createdAiAssessmentId ในตาราง ai_assessments เพื่อป้องกัน Foreign Key Error
+        let validAiAssessmentId: number | null = null;
+        if (createdAiAssessmentId) {
+          const aiCheck = await db.query('SELECT id FROM ai_assessments WHERE id = $1', [createdAiAssessmentId]);
+          if (aiCheck.rows.length > 0) {
+            validAiAssessmentId = createdAiAssessmentId;
+          }
+        }
+
+        // ประกอบข้อความบันทึก/คำแนะนำใบสั่งยา
+        const noteParts: string[] = [];
+        if (preparation) noteParts.push(`วิธีปรุงยา: ${preparation}`);
+        if (usage_instruction) noteParts.push(`วิธีใช้: ${usage_instruction}`);
+        if (duration_days) noteParts.push(`ระยะเวลารับประทาน: ${duration_days} วัน`);
+        const userNotes = notes || prescription_notes;
+        if (userNotes && !noteParts.some(p => p.includes(userNotes))) {
+          noteParts.push(userNotes);
+        }
+        const pNotes = noteParts.length > 0 ? noteParts.join(' | ') : null;
+
+        // ตรวจสอบว่าใน visit นี้มีใบสั่งยาอยู่แล้วหรือไม่ (UPSERT: Update or Insert)
+        const existingRx = await db.query(
+          'SELECT id, prescription_no FROM prescriptions WHERE visit_id = $1 ORDER BY id DESC LIMIT 1',
+          [visitId]
         );
-        if (rxInsert.rows.length > 0) {
-          createdPrescription = rxInsert.rows[0];
+
+        if (existingRx.rows.length > 0) {
+          const existingId = existingRx.rows[0].id;
+          const rxUpdate = await db.query(
+            `UPDATE prescriptions
+             SET doctor_id = $1,
+                 herbs = $2,
+                 notes = COALESCE($3, notes),
+                 ai_assessment_id = COALESCE($4, ai_assessment_id),
+                 updated_at = NOW()
+             WHERE id = $5
+             RETURNING *`,
+            [
+              effectiveDocId,
+              JSON.stringify(herbList),
+              pNotes,
+              validAiAssessmentId,
+              existingId
+            ]
+          );
+          createdPrescription = rxUpdate.rows[0];
+          console.log(`✅ Updated existing prescription ID ${existingId} for visit ${visitId}`);
+        } else {
+          const today = dayjs().format('YYYYMMDD');
+          const countResult = await db.query(
+            "SELECT COUNT(*) as count FROM prescriptions WHERE created_at::date = CURRENT_DATE"
+          );
+          const seq = String(parseInt(countResult.rows[0]?.count || '0', 10) + 1).padStart(3, '0');
+          const prescriptionNo = `RX-${today}-${seq}-${Date.now().toString().slice(-4)}`;
+
+          const rxInsert = await db.query(
+            `INSERT INTO prescriptions
+              (visit_id, doctor_id, prescription_no, herbs, notes, ai_assessment_id)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING *`,
+            [
+              visitId,
+              effectiveDocId,
+              prescriptionNo,
+              JSON.stringify(herbList),
+              pNotes,
+              validAiAssessmentId
+            ]
+          );
+          if (rxInsert.rows.length > 0) {
+            createdPrescription = rxInsert.rows[0];
+            console.log(`✅ Created new prescription ${prescriptionNo} for visit ${visitId}`);
+          }
         }
       } catch (rxErr) {
-        console.warn('⚠️ Could not insert into prescriptions:', rxErr);
+        console.error('❌ Could not save into prescriptions:', rxErr);
       }
     }
 

@@ -136,18 +136,21 @@ export function calculateZodiacSamutthana(
   lunarPhase: LunarPhase,
   lunarMonth: number
 ): ZodiacSamutthanaResult {
+  const normLunarMonth = lunarMonth === 88 ? 8 : Math.min(Math.max(lunarMonth, 1), 12);
+
   // หาดัชนีช่วงราศีเกิด (1-12)
   let birthPeriodIndex: number;
   if (lunarPhase === 'waning') {
-    birthPeriodIndex = lunarMonth >= 4 ? lunarMonth - 3 : lunarMonth + 9;
+    birthPeriodIndex = normLunarMonth >= 4 ? normLunarMonth - 3 : normLunarMonth + 9;
   } else {
-    birthPeriodIndex = lunarMonth >= 5 ? lunarMonth - 4 : lunarMonth + 8;
+    birthPeriodIndex = normLunarMonth >= 5 ? normLunarMonth - 4 : normLunarMonth + 8;
   }
+  birthPeriodIndex = Math.min(Math.max(birthPeriodIndex, 1), 12);
 
   const birthPeriod = ZODIAC_PERIODS[birthPeriodIndex - 1];
 
   // วันปฏิสนธิ: นับถอยหลังไปอีก 9 เดือน (9 เดือนทางจันทรคติ)
-  const conceptionMonthNum = ((lunarMonth - 1 - 9 + 12) % 12) + 1;
+  const conceptionMonthNum = ((normLunarMonth - 1 - 9 + 12) % 12) + 1;
   const conceptionPeriodIndex = ((conceptionMonthNum - 5 + 12) % 12) + 1;
   const conceptionPeriod = ZODIAC_PERIODS[conceptionPeriodIndex - 1];
 
