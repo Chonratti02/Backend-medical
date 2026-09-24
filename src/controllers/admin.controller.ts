@@ -6,15 +6,21 @@ import db from "../config/database";
  * ดูรายการบัญชี staff ที่รอ admin อนุมัติ
  */
 export const getPendingStaff = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { rows } = await db.query(
-      `SELECT id, username, full_name, role, license_link, is_active, created_at
-       FROM staff WHERE is_active = FALSE ORDER BY created_at ASC`,
-    );
+    const { role } = req.query;
+    let query = `SELECT id, username, full_name, role, license_link, is_active, created_at
+       FROM staff WHERE is_active = FALSE`;
+    const params: any[] = [];
+    if (role && typeof role === 'string' && role !== 'all') {
+      params.push(role);
+      query += ` AND role = $${params.length}`;
+    }
+    query += ' ORDER BY created_at ASC';
+    const { rows } = await db.query(query, params);
     res.json({ success: true, data: rows });
   } catch (err) {
     next(err);

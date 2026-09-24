@@ -3,14 +3,20 @@ import bcrypt from "bcryptjs";
 import db from "../config/database";
 
 export const getAll = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const { rows } = await db.query(
-      'SELECT id, username, full_name, role, license_link, is_active, created_at FROM staff ORDER BY role, full_name'
-    );
+    const { role } = req.query;
+    let query = 'SELECT id, username, full_name, role, license_link, is_active, created_at FROM staff';
+    const params: any[] = [];
+    if (role && typeof role === 'string' && role !== 'all') {
+      params.push(role);
+      query += ` WHERE role = $${params.length}`;
+    }
+    query += ' ORDER BY role, full_name';
+    const { rows } = await db.query(query, params);
     res.json({ success: true, data: rows });
   } catch (err) {
     next(err);
