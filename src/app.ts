@@ -5,11 +5,11 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 
-import authRoutes         from './routes/auth.routes';
-import staffRoutes        from './routes/staff.routes';
-import patientRoutes      from './routes/patient.routes';
-import visitRoutes        from './routes/visit.routes';
-import aiRoutes           from './routes/ai.routes';
+import authRoutes from './routes/auth.routes';
+import staffRoutes from './routes/staff.routes';
+import patientRoutes from './routes/patient.routes';
+import visitRoutes from './routes/visit.routes';
+import aiRoutes from './routes/ai.routes';
 import prescriptionRoutes from './routes/prescription.routes';
 import adminRoutes from './routes/admin.router';
 import diseaseRoutes from './routes/disease.routes';
@@ -20,7 +20,7 @@ const app: Application = express();
 // ─── Security Middlewares ─────────────────────────────────
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL ?? 'http://localhost:4200',
+  origin: ["http://localhost:4200", "https://thaimedxai.web.app"],
   credentials: true,
 }));
 
@@ -59,13 +59,13 @@ app.use(['/api/v1/visits', '/api/v1/patients'], (_req: Request, res: Response, n
   next();
 });
 
-app.use('/api/v1/auth',          authRoutes);
-app.use('/api/v1/staff',         staffRoutes);
-app.use('/api/v1/patients',      patientRoutes);
-app.use('/api/v1/visits',        visitRoutes);
-app.use('/api/v1/ai',            aiRoutes);
-app.use('/api/ai',               aiRoutes);
-app.use('/api/analyze',          aiRoutes);
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/staff', staffRoutes);
+app.use('/api/v1/patients', patientRoutes);
+app.use('/api/v1/visits', visitRoutes);
+app.use('/api/v1/ai', aiRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/analyze', aiRoutes);
 app.use('/api/v1/prescriptions', prescriptionRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/diseases', diseaseRoutes);
