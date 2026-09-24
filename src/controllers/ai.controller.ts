@@ -448,7 +448,7 @@ export const getLatestAssessment = async (req: Request, res: Response, next: Nex
       params.push(patient_id);
       query += ` AND patient_id = $1`;
     } else {
-      res.status(400).json({ success: false, message: 'Missing patient_id or visit_id' });
+      res.json({ success: true, data: null });
       return;
     }
 

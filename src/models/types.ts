@@ -156,6 +156,7 @@ export interface PrescriptionHerb {
   name: string;
   role: string;
   role_name: string;
+  used_part?: string | null;
   detail?: string | null;
 }
 

@@ -146,18 +146,19 @@ export function calculateZodiacSamutthana(
 
   const birthPeriod = ZODIAC_PERIODS[birthPeriodIndex - 1];
 
-  // วันปฏิสนธิ: นับถอยหลังไปอีก 9 เดือน (9 ราศี)
-  const conceptionPeriodIndex = ((birthPeriodIndex - 1 - 9 + 12) % 12) + 1;
+  // วันปฏิสนธิ: นับถอยหลังไปอีก 9 เดือน (9 เดือนทางจันทรคติ)
+  const conceptionMonthNum = ((lunarMonth - 1 - 9 + 12) % 12) + 1;
+  const conceptionPeriodIndex = ((conceptionMonthNum - 5 + 12) % 12) + 1;
   const conceptionPeriod = ZODIAC_PERIODS[conceptionPeriodIndex - 1];
 
-  // เดือนปฏิสนธิทางจันทรคติ
-  const conceptionMonthNum = ((lunarMonth - 1 - 9 + 12) % 12) + 1;
   const thaiMonthNames: Record<number, string> = {
-    1: 'เดือน 1 (เดือนอ้าย)', 2: 'เดือน 2 (เดือนยี่)', 3: 'เดือน 3',
-    4: 'เดือน 4', 5: 'เดือน 5', 6: 'เดือน 6',
-    7: 'เดือน 7', 8: 'เดือน 8', 9: 'เดือน 9',
-    10: 'เดือน 10', 11: 'เดือน 11', 12: 'เดือน 12'
+    1: 'มกราคม', 2: 'กุมภาพันธ์', 3: 'มีนาคม',
+    4: 'เมษายน', 5: 'พฤษภาคม', 6: 'มิถุนายน',
+    7: 'กรกฎาคม', 8: 'สิงหาคม', 9: 'กันยายน',
+    10: 'ตุลาคม', 11: 'พฤศจิกายน', 12: 'ธันวาคม'
   };
+  const monthName = thaiMonthNames[conceptionMonthNum] || `เดือน ${conceptionMonthNum}`;
+  const conceptionLunarMonth = `${monthName}(${conceptionMonthNum})`;
 
   return {
     birthZodiac: birthPeriod.zodiac,
@@ -166,7 +167,7 @@ export function calculateZodiacSamutthana(
     birthRakon: birthPeriod.rakon,
     birthElementDesc: `${birthPeriod.element} ${birthPeriod.samutthana} ${birthPeriod.rakon} ${birthPeriod.zodiac}`,
 
-    conceptionLunarMonth: thaiMonthNames[conceptionMonthNum] ?? `เดือน ${conceptionMonthNum}`,
+    conceptionLunarMonth: conceptionLunarMonth,
     conceptionZodiac: conceptionPeriod.zodiac,
     conceptionZodiacElement: conceptionPeriod.element,
     conceptionSamutthana: conceptionPeriod.samutthana,
