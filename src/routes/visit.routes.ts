@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import * as visitController from '../controllers/visit.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, authorize } from '../middlewares/auth.middleware';
 
 const router = Router();
 
 router.use(authenticate);
+router.use(authorize('doctor', 'admin'));
 
 // POST /api/v1/visits
 router.post('/', visitController.create);

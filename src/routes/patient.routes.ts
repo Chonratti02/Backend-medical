@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import * as patientController from '../controllers/patient.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, authorize } from '../middlewares/auth.middleware';
 
 const router = Router();
 
 router.use(authenticate);
+router.use(authorize('doctor', 'admin'));
 
 // GET    /api/v1/patients
 router.get('/', patientController.getAll);

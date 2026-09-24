@@ -20,7 +20,11 @@ const app: Application = express();
 // ─── Security Middlewares ─────────────────────────────────
 app.use(helmet());
 app.use(cors({
-  origin: ["http://localhost:4200", "https://thaimedxai.web.app"],
+  origin: [
+    "http://localhost:4200",
+    "https://thaimedxai.web.app",
+    "https://thaimedxai.firebaseapp.com"
+  ],
   credentials: true,
 }));
 

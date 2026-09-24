@@ -5,6 +5,7 @@ import { authenticate, authorize } from '../middlewares/auth.middleware';
 const router = Router();
 
 router.use(authenticate);
+router.use(authorize('doctor', 'admin'));
 
 // POST /api/v1/prescriptions
 router.post('/', authorize('doctor', 'admin'), prescriptionController.create);
