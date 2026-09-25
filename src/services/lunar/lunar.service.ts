@@ -407,19 +407,12 @@ export function calculateZodiacSamutthana(
 
   const birthPeriod = ZODIAC_PERIODS[birthPeriodIndex - 1];
 
-  // วันปฏิสนธิ: นับถอยหลังไปอีก 9 เดือน (9 เดือนทางจันทรคติ)
-  const conceptionMonthNum = ((normLunarMonth - 1 - 9 + 12) % 12) + 1;
-  const conceptionPeriodIndex = ((conceptionMonthNum - 5 + 12) % 12) + 1;
+  // วันปฏิสนธิ: นับถอยหลังไปอีก 9 เดือน (9 ช่วงราศีทางจันทรคติ)
+  const conceptionPeriodIndex = ((birthPeriodIndex - 1 - 9 + 12) % 12) + 1;
   const conceptionPeriod = ZODIAC_PERIODS[conceptionPeriodIndex - 1];
 
-  const thaiMonthNames: Record<number, string> = {
-    1: 'มกราคม', 2: 'กุมภาพันธ์', 3: 'มีนาคม',
-    4: 'เมษายน', 5: 'พฤษภาคม', 6: 'มิถุนายน',
-    7: 'กรกฎาคม', 8: 'สิงหาคม', 9: 'กันยายน',
-    10: 'ตุลาคม', 11: 'พฤศจิกายน', 12: 'ธันวาคม'
-  };
-  const monthName = thaiMonthNames[conceptionMonthNum] || `เดือน ${conceptionMonthNum}`;
-  const conceptionLunarMonth = `${monthName}(${conceptionMonthNum})`;
+  const conceptionMonthNum = ((normLunarMonth - 1 - 9 + 12) % 12) + 1;
+  const conceptionLunarMonth = conceptionMonthNum === 88 ? 'เดือน 8 สองหน' : `เดือน ${conceptionMonthNum}`;
 
   return {
     birthZodiac: birthPeriod.zodiac,
