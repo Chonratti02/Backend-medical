@@ -11,12 +11,15 @@ import { uploadBufferToCloudinary } from '../config/cloudinary';
  */
 export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { username, password, full_name, role = 'doctor' } = req.body as {
+    const { username, password, full_name } = req.body as {
       username: string;
       password: string;
       full_name: string;
       role?: string;
     };
+
+    // ป้องกัน Privilege Escalation: บังคับให้การสมัครสมาชิกผ่าน Public Register ได้รับสิทธิ์เป็นแพทย์ (doctor) เท่านั้น ไม่อนุญาตให้ขอสิทธิ์ admin
+    const assignedRole: 'doctor' = 'doctor';
 
     if (!username || !password || !full_name) {
       res.status(400).json({ success: false, message: 'กรุณากรอกข้อมูลให้ครบถ้วน (ชื่อผู้ใช้, รหัสผ่าน, ชื่อ-สกุล)' });
@@ -60,7 +63,7 @@ export const register = async (req: Request, res: Response, next: NextFunction):
       `INSERT INTO staff (username, password_hash, full_name, role, license_link, is_active, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
        RETURNING id, username, full_name, role, license_link, is_active, created_at`,
-      [username.trim(), passwordHash, full_name.trim(), role, licenseLink]
+      [username.trim(), passwordHash, full_name.trim(), assignedRole, licenseLink]
     );
 
     res.status(201).json({

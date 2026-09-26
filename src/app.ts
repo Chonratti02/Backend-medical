@@ -3,7 +3,6 @@ import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
 
 import authRoutes from './routes/auth.routes';
 import staffRoutes from './routes/staff.routes';
@@ -14,8 +13,20 @@ import prescriptionRoutes from './routes/prescription.routes';
 import adminRoutes from './routes/admin.router';
 import diseaseRoutes from './routes/disease.routes';
 import herbRoutes from './routes/herb.routes';
+import {
+  authLoginLimiter,
+  authRegisterLimiter,
+  aiDiagnoseLimiter,
+  knowledgeUploadLimiter,
+  searchLimiter,
+  generalApiLimiter,
+} from './middlewares/rateLimit.middleware';
 
 const app: Application = express();
+
+// ─── Reverse Proxy Support ────────────────────────────────
+// อ่าน IP ผู้ใช้จริงเมื่ออยู่หลัง Reverse Proxy (Render, Nginx, Cloudflare)
+app.set('trust proxy', 1);
 
 // ─── Security Middlewares ─────────────────────────────────
 app.use(helmet());
@@ -28,13 +39,24 @@ app.use(cors({
   credentials: true,
 }));
 
-// ─── Rate Limiting ────────────────────────────────────────
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { success: false, message: 'Too many requests, please try again later.' },
-});
-app.use('/api', limiter);
+// ─── Tiered Rate Limiting ─────────────────────────────────
+// 1. เข้าสู่ระบบ: ป้องกัน Brute-force (10 ครั้ง / 15 นาที เฉพาะครั้งที่ไม่ผ่าน)
+app.use('/api/v1/auth/login', authLoginLimiter);
+
+// 2. สมัครสมาชิก: ป้องกัน Spam และการอัปโหลดไฟล์ขยะ (5 ครั้ง / 1 ชั่วโมง)
+app.use('/api/v1/auth/register', authRegisterLimiter);
+
+// 3. AI Diagnose: ควบคุมค่าใช้จ่าย Token และโหลดของเซิร์ฟเวอร์ (20 ครั้ง / 1 นาที ต่อแพทย์)
+app.use(['/api/v1/ai/analyze', '/api/analyze', '/api/ai/analyze'], aiDiagnoseLimiter);
+
+// 4. Knowledge Upload: ป้องกันภาระหนักจากไฟล์ขนาดใหญ่ (15 ครั้ง / 15 นาที ต่อ Admin)
+app.use(['/api/v1/ai/knowledge/upload', '/api/v1/ai/knowledge/uploads/:id/retry'], knowledgeUploadLimiter);
+
+// 5. Search & Autocomplete: รองรับการพิมพ์ค้นหาชื่อยา/โรคแบบ Real-time Debounce (800 ครั้ง / 15 นาที)
+app.use(['/api/v1/herbs', '/api/v1/diseases', '/api/v1/patients/search'], searchLimiter);
+
+// 6. General API: รองรับการใช้งานคลินิกหลายโต๊ะตรวจพร้อมกัน (1,000 ครั้ง / 15 นาที)
+app.use('/api', generalApiLimiter);
 
 // ─── Body Parsing ─────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));

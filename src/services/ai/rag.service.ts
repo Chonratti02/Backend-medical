@@ -760,13 +760,8 @@ export const ragService = {
     const { herbs: dbHerbs, diseases: dbDiseases } =
       await getCanonicalKnowledge();
 
-    // ข้อมูลทั่วไป & ระบุตัวตน
-    const nameVal =
-      patientData?.name ||
-      ((context as any)?.first_name
-        ? `${(context as any)?.prefix || ""}${(context as any)?.first_name} ${(context as any)?.last_name || ""}`.trim()
-        : "") ||
-      "ไม่ระบุชื่อ";
+    // ข้อมูลทั่วไป & ระบุตัวตน (De-identification: ไม่ส่งชื่อจริงหรือรหัสสมมุติไป AI ตามมาตรฐาน PDPA)
+    const nameVal = "ผู้ป่วย";
     const genderVal = patientData?.gender || context?.gender;
     const genderStr =
       genderVal === "male"
@@ -850,8 +845,8 @@ export const ragService = {
     );
 
     const patientClinicalSections = `
-[ส่วนที่ 1: ข้อมูลทั่วไปและการระบุตัวตนผู้ป่วย (Patient Demographics)]
-- ชื่อ-นามสกุล: ${nameVal}
+[ส่วนที่ 1: ข้อมูลทั่วไปของผู้ป่วย (Patient Demographics)]
+- ข้อมูลผู้ป่วย: ${nameVal} (ไม่ระบุตัวตนตามมาตรฐาน PDPA)
 - เพศ: ${genderStr} | อายุ: ${ageVal ? `${ageVal} ปี` : "ไม่ระบุ"}
 - วันเกิด: ${dobVal || "ไม่ระบุ"} (วันในสัปดาห์: ${dayOfWeekVal || "ไม่ระบุ"}) | เวลาเกิด (Birth Time): ${birthTimeVal || "ไม่ระบุ"}
 - หมู่โลหิต: ${bloodVal}
