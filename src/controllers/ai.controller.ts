@@ -32,13 +32,13 @@ const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
   filename: (_req, file, cb) => {
     const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-    const safeName = fixUtf8Filename(file.originalname);
+    const safeName = path.basename(fixUtf8Filename(file.originalname));
     cb(null, `${unique}-${safeName}`);
   },
 });
 
 const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const safeName = fixUtf8Filename(file.originalname);
+  const safeName = path.basename(fixUtf8Filename(file.originalname));
   const ext = path.extname(safeName).toLowerCase();
   const allowed = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.csv'];
   if (allowed.includes(ext)) {

@@ -14,8 +14,6 @@
   },
   "dependencies": {
     "@google/genai": "^2.23.0",
-    "@langchain/community": "^0.0.40",
-    "@langchain/google-genai": "^0.0.10",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.11.0",
     "cors": "^2.8.5",

@@ -74,8 +74,8 @@ USER node
 
 EXPOSE 3000
 
-# Health check using the Express /health endpoint
+# Health check using the Express /health endpoint (supports dynamic PORT on Railway/Render)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+  CMD sh -c "wget --no-verbose --tries=1 --spider http://127.0.0.1:\${PORT:-3000}/health || exit 1"
 
 CMD ["node", "dist/server.js"]
