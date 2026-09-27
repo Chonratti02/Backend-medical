@@ -6,11 +6,7 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "nodemon --exec ts-node src/server.ts",
-    "build": "tsc",
-    "db:migrate": "ts-node src/config/migrate.ts",
-    "db:update": "ts-node src/config/update-db.ts",
-    "db:seed": "ts-node src/config/seed.ts",
-    "knowledge:seed": "ts-node src/config/seed-knowledge.ts"
+    "build": "rm -rf dist && tsc"
   },
   "dependencies": {
     "@google/genai": "^2.23.0",
