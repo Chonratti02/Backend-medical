@@ -33,8 +33,7 @@ app.use(helmet());
 app.use(cors({
   origin: [
     "http://localhost:4200",
-    "https://thaimedxai.web.app",
-    "https://thaimedxai.firebaseapp.com"
+    "https://vejvinichai.web.app"
   ],
   credentials: true,
 }));
