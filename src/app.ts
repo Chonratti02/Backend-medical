@@ -31,10 +31,23 @@ app.set('trust proxy', 1);
 // ─── Security Middlewares ─────────────────────────────────
 app.use(helmet());
 app.use(cors({
-  origin: [
-    "http://localhost:4200",
-    "https://vejvinichai.web.app"
-  ],
+  origin: (origin, callback) => {
+    const defaultAllowed = [
+      "http://localhost:4200",
+      "https://vejvinichai.web.app",
+      "https://thaimedxai.web.app",
+    ];
+    const envAllowed = process.env.FRONTEND_URL
+      ? process.env.FRONTEND_URL.split(',').map((s) => s.trim())
+      : [];
+    const allowed = [...defaultAllowed, ...envAllowed];
+
+    if (!origin || allowed.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS Error: Origin ${origin} not allowed`));
+    }
+  },
   credentials: true,
 }));
 
