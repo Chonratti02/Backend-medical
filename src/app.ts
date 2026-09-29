@@ -35,7 +35,6 @@ app.use(cors({
     const defaultAllowed = [
       "http://localhost:4200",
       "https://vejvinichai.web.app",
-      "https://thaimedxai.web.app",
     ];
     const envAllowed = process.env.FRONTEND_URL
       ? process.env.FRONTEND_URL.split(',').map((s) => s.trim())
